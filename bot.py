@@ -1,5 +1,10 @@
+import collections
+import collections.abc
+collections.Mapping = collections.abc.Mapping
+collections.Sequence = collections.abc.Sequence
+collections.Iterable = collections.abc.Iterable
+
 import os
-import time
 import socket
 import logging
 from datetime import datetime
@@ -247,3 +252,4 @@ if name == "main":
         logger.info("👋 Бот зупинено")
     except Exception as e:
         logger.error(f"❌ Критична помилка: {e}")
+
