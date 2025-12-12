@@ -1,15 +1,9 @@
-import collections
-import collections.abc
-collections.Mapping = collections.abc.Mapping
-collections.Sequence = collections.abc.Sequence
-collections.Iterable = collections.abc.Iterable
-
 import os
 import socket
 import logging
 from datetime import datetime
 
-import valve.source.a2s
+import a2s
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext
 from dotenv import load_dotenv
@@ -22,7 +16,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(name)
 
 # Отримуємо змінні середовища з Render.com
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
@@ -52,38 +46,38 @@ def get_server_info():
     try:
         logger.info(f"🔍 Запит до сервера CS 1.6 {MIX_SERVER_IP}:{MIX_SERVER_PORT}")
         
-        # Для CS 1.6 використовуємо протокол GoldSource
-        with valve.source.a2s.ServerQuerier((MIX_SERVER_IP, MIX_SERVER_PORT), timeout=5.0) as server:
-            info = server.info()
-            
-            # Спробуємо отримати список гравців
-            players_list = []
-            try:
-                players = server.players()
-                for player in players['players']:
-                    if player['name'] and player['name'].strip():
-                        players_list.append({
-                            'name': player['name'],
-                            'duration': player['duration'],
-                            'score': player['score'] if 'score' in player else 0
-                        })
-            except Exception as e:
-                logger.warning(f"⚠️ Не вдалося отримати список гравців: {e}")
-            
-            return {
-                'status': 'online',
-                'server_name': info['server_name'],
-                'map': info['map'],
-                'players': f"{info['player_count']}/{info['max_players']}",
-                'player_count': info['player_count'],
-                'max_players': info['max_players'],
-                'players_list': players_list,
-                'game': info['game'],
-                'folder': info['folder']
-            }
-            
-    except valve.source.NoResponseError:
-        logger.warning(f"⚠️ Сервер CS 1.6 {MIX_SERVER_IP}:{MIX_SERVER_PORT} не відповідає")
+        # Отримуємо інформацію про сервер
+        server_address = (MIX_SERVER_IP, MIX_SERVER_PORT)
+        info = a2s.info(server_address, timeout=5.0)
+        
+        # Спробуємо отримати список гравців
+        players_list = []
+        try:
+            players = a2s.players(server_address, timeout=3.0)
+            for player in players:
+                if player.name and player.name.strip():
+                    players_list.append({
+                        'name': player.name,
+                        'duration': player.duration,
+                        'score': player.score if hasattr(player, 'score') else 0
+                    })
+        except Exception as e:
+            logger.warning(f"⚠️ Не вдалося отримати список гравців: {e}")
+        
+        return {
+            'status': 'online',
+            'server_name': info.server_name,
+            'map': info.map_name,
+            'players': f"{info.player_count}/{info.max_players}",
+            'player_count': info.player_count,
+            'max_players': info.max_players,
+            'players_list': players_list,
+            'game': info.game,
+            'folder': info.folder if hasattr(info, 'folder') else 'cstrike'
+        }
+        
+    except a2s.BrokenMessageError:
+        logger.warning(f"⚠️ Сервер CS 1.6 {MIX_SERVER_IP}:{MIX_SERVER_PORT} не відповідає коректно")
         return {
             'status': 'offline',
             'message': 'Сервер не відповідає на запит'
@@ -118,8 +112,9 @@ def check_server_availability():
     except Exception as e:
         logger.error(f"❌ Помилка перевірки сервера CS 1.6: {e}")
         return False
+
 async def mix_command(update: Update, context: CallbackContext):
-    """Обробник команди /mix - показує інформацію про CS 1.6 MIX сервер"""
+   """Обробник команди /mix - показує інформацію про CS 1.6 MIX сервер"""
     try:
         logger.info(f"📱 Команда /mix від {update.effective_user.id}")
         
@@ -203,9 +198,9 @@ async def mix_command(update: Update, context: CallbackContext):
 async def start_command(update: Update, context: CallbackContext):
     """Обробник команди /start"""
     await update.message.reply_text(
-        "🤖 Привіт! Я бот для відстеження сервера BOT1CS\n\n"
+        "🤖 Привіт! Я бот для відстеження сервера Bot1cs Automix | [5x5]\n\n"
         "Доступні команди:\n"
-        "/mix - інформація про сервер CS 1.6 MIX\n\n"
+        "/mix - інформація про сервер Bot1cs Automix | [5x5]\n\n"
         f"📍 Сервер: {MIX_SERVER_IP}:{MIX_SERVER_PORT}\n"
         f"🎮 Версія: 1.0"
     )
@@ -214,7 +209,7 @@ async def help_command(update: Update, context: CallbackContext):
     """Обробник команди /help"""
     await update.message.reply_text(
         "📖 *Доступні команди:*\n\n"
-        "/mix - отримати інформацію про сервер CS 1.6 MIX\n"
+        "/mix - отримати інформацію про сервер bot1cs\n"
         "/start - початок роботи з ботом\n"
         "/help - довідка\n\n"
         f"📍 Адреса сервера: {MIX_SERVER_IP}:{MIX_SERVER_PORT}",
@@ -235,7 +230,7 @@ def run_bot():
     logger.info(f"📡 Сервер: {MIX_SERVER_IP}:{MIX_SERVER_PORT}")
     application.run_polling()
 
-if __name__ == "__main__":
+if name == "main":
     logger.info("🚀 Запуск бота для CS 1.6 MIX сервера...")
     
     # Перевіряємо з'єднання з сервером
@@ -252,6 +247,3 @@ if __name__ == "__main__":
         logger.info("👋 Бот зупинено")
     except Exception as e:
         logger.error(f"❌ Критична помилка: {e}")
-
-
-
