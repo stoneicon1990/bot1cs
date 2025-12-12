@@ -235,7 +235,7 @@ def run_bot():
     logger.info(f"📡 Сервер: {MIX_SERVER_IP}:{MIX_SERVER_PORT}")
     application.run_polling()
 
-if name == "main":
+if __name__ == "__main__":
     logger.info("🚀 Запуск бота для CS 1.6 MIX сервера...")
     
     # Перевіряємо з'єднання з сервером
@@ -252,4 +252,5 @@ if name == "main":
         logger.info("👋 Бот зупинено")
     except Exception as e:
         logger.error(f"❌ Критична помилка: {e}")
+
 
