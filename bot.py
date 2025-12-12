@@ -22,7 +22,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
-logger = logging.getLogger(name)
+logger = logging.getLogger(__name__)
 
 # Отримуємо змінні середовища з Render.com
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
@@ -252,5 +252,6 @@ if __name__ == "__main__":
         logger.info("👋 Бот зупинено")
     except Exception as e:
         logger.error(f"❌ Критична помилка: {e}")
+
 
 
