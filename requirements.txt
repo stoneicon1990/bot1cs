@@ -1,0 +1,5 @@
+flask
+python-telegram-bot
+python-valve
+
+python-dotenv
