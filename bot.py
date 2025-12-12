@@ -275,7 +275,7 @@ def run_bot():
     application.add_handler(CallbackQueryHandler(button_handler))
 
     # Запускаємо бота
-    print("🤖 Бот Royal Arena запущений! Для зупинки натисніть Ctrl+C")
+    print("🤖 Бот bot1cs запущений! Для зупинки натисніть Ctrl+C")
     application.run_polling()
 
 if __name__ == "__main__":
@@ -293,4 +293,5 @@ if __name__ == "__main__":
 
     # Запускаємо бота в основному потоці
     run_bot()
+
 
