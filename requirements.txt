@@ -1,5 +1,4 @@
-flask
-python-telegram-bot
-python-valve
-
-python-dotenv
+python-telegram-bot==20.3
+python-a2s==1.3.1
+Flask==2.3.3
+python-dotenv==1.0.0
