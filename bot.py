@@ -1,133 +1,249 @@
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext
-from datetime import datetime
+import os
 import time
 import socket
-from threading import Thread
+import logging
+from datetime import datetime
 
-# Імпорт ваших функцій
-from config import CONFIG
-from server_info import get_server_info  # припускаючи, що ця функція існує
-from web_server import run_web_server  # припускаючи, що ця функція існує
+import valve.source.a2s
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackContext
+from dotenv import load_dotenv
+
+# Завантажуємо змінні середовища
+load_dotenv()
+
+# Налаштування логування
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(name)
+
+# Отримуємо змінні середовища з Render.com
+BOT_TOKEN = os.environ.get('BOT_TOKEN')
+MIX_SERVER_IP = os.environ.get('MIX_SERVER_IP')
+MIX_SERVER_PORT = int(os.environ.get('MIX_SERVER_PORT', 27015))
+
+# Перевірка обов'язкових змінних
+if not BOT_TOKEN:
+    logger.error("❌ Змінна BOT_TOKEN не встановлена")
+    exit(1)
+
+if not MIX_SERVER_IP:
+    logger.error("❌ Змінна MIX_SERVER_IP не встановлена")
+    exit(1)
 
 def escape_markdown(text):
     """Екранує спецсимволи MarkdownV2"""
     if not text:
         return ""
-    escape_chars = r'_*[]()~>#+-=|{}.!'
+    escape_chars = r'_*[]()~`>#+-=|{}.!'
     return ''.join(['\\' + char if char in escape_chars else char for char in str(text)])
 
-def check_server_availability(ip, port, timeout=3):
-    """Перевіряє доступність сервера"""
+def get_server_info():
+    """
+    Отримує інформацію про сервер CS 1.6 через A2S запит
+    """
     try:
-        socket.create_connection((ip, port), timeout=timeout)
-        return True
-    except (socket.gaierror, socket.timeout, ConnectionRefusedError) as e:
-        return False
+        logger.info(f"🔍 Запит до сервера CS 1.6 {MIX_SERVER_IP}:{MIX_SERVER_PORT}")
+        
+        # Для CS 1.6 використовуємо протокол GoldSource
+        with valve.source.a2s.ServerQuerier((MIX_SERVER_IP, MIX_SERVER_PORT), timeout=5.0) as server:
+            info = server.info()
+            
+            # Спробуємо отримати список гравців
+            players_list = []
+            try:
+                players = server.players()
+                for player in players['players']:
+                    if player['name'] and player['name'].strip():
+                        players_list.append({
+                            'name': player['name'],
+                            'duration': player['duration'],
+                            'score': player['score'] if 'score' in player else 0
+                        })
+            except Exception as e:
+                logger.warning(f"⚠️ Не вдалося отримати список гравців: {e}")
+            
+            return {
+                'status': 'online',
+                'server_name': info['server_name'],
+                'map': info['map'],
+                'players': f"{info['player_count']}/{info['max_players']}",
+                'player_count': info['player_count'],
+                'max_players': info['max_players'],
+                'players_list': players_list,
+                'game': info['game'],
+                'folder': info['folder']
+            }
+            
+    except valve.source.NoResponseError:
+        logger.warning(f"⚠️ Сервер CS 1.6 {MIX_SERVER_IP}:{MIX_SERVER_PORT} не відповідає")
+        return {
+            'status': 'offline',
+            'message': 'Сервер не відповідає на запит'
+        }
+    except socket.timeout:
+        logger.warning(f"⚠️ Таймаут підключення до {MIX_SERVER_IP}:{MIX_SERVER_PORT}")
+        return {
+            'status': 'offline',
+            'message': 'Таймаут підключення'
+        }
+    except socket.gaierror as e:
+        logger.error(f"❌ Помилка DNS для {MIX_SERVER_IP}:{MIX_SERVER_PORT}: {e}")
+        return {
+            'status': 'error',
+            'message': f'Помилка DNS: {str(e)}'
+        }
+    except Exception as e:
+        logger.error(f"❌ Помилка запиту до сервера CS 1.6: {e}")
+        return {
+            'status': 'error',
+            'message': str(e)
+        }
 
-async def mix_command(update: Update, context: CallbackContext):
-    """Обробник команди /mix - показує інформацію про MIX сервер"""
+def check_server_availability():
+    """Перевіряє доступність сервера CS 1.6"""
     try:
-        # Отримуємо конфігурацію MIX сервера
-        mix_ip = CONFIG.get('mix_server_ip')
-        mix_port = CONFIG.get('mix_server_port', 27015)  # значення за замовчуванням
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(3)
+        result = sock.connect_ex((MIX_SERVER_IP, MIX_SERVER_PORT))
+        sock.close()
+        return result == 0
+    except Exception as e:
+        logger.error(f"❌ Помилка перевірки сервера CS 1.6: {e}")
+        return False
+async def mix_command(update: Update, context: CallbackContext):
+    """Обробник команди /mix - показує інформацію про CS 1.6 MIX сервер"""
+    try:
+        logger.info(f"📱 Команда /mix від {update.effective_user.id}")
         
-        # Перевіряємо, чи вказана конфігурація
-        if not mix_ip or mix_ip == 'ваш_mix_сервер_ip':
-            await update.message.reply_text(
-                "⚠️ Сервер MIX не налаштований.\n"
-                "Будь ласка, зверніться до адміністратора."
-            )
-            return
-        
-        # Перевіряємо доступність сервера
-        if not check_server_availability(mix_ip, mix_port):
-            await update.message.reply_text(
-                f"🔴 Сервер MIX ({mix_ip}:{mix_port}) недоступний.\n"
-                f"Перевірте правильність IP-адреси та порту."
-            )
-            return
+        # Відправляємо повідомлення про завантаження
+        loading_msg = await update.message.reply_text("🔄 Отримую інформацію з сервера...")
         
         # Отримуємо інформацію про сервер
-        data = get_server_info(mix_ip, mix_port)
+        data = get_server_info()
         
         if data['status'] == 'offline':
-            await update.message.reply_text("🔴 Сервер MIX не відповідає. Можливо, він вимкнений або недоступний.")
+            await loading_msg.edit_text(
+                f"🔴 Сервер CS 1.6 MIX ({MIX_SERVER_IP}:{MIX_SERVER_PORT}) не відповідає.\n"
+                f"Можливо, він вимкнений або недоступний."
+            )
             return
+            
         if data['status'] == 'error':
-            await update.message.reply_text(f"⚠️ Помилка сервера MIX: {data['message']}")
+            await loading_msg.edit_text(
+                f"⚠️ Помилка сервера CS 1.6 MIX: {data['message']}\n"
+                f"Адреса: {MIX_SERVER_IP}:{MIX_SERVER_PORT}"
+            )
             return
 
-        # Отримуємо поточний час для відображення
+        # Отримуємо поточний час
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Екрануємо назву сервера
+        server_name = escape_markdown(data['server_name'])
+        map_name = escape_markdown(data['map'])
 
-        # Формуємо повідомлення для /mix
+        # Формуємо повідомлення
         message = (
-            f"🎮 *{escape_markdown(data['server_name'])} MIX*\n"
-            f"🗺 Мапа: {escape_markdown(data['map'])}`\n"
-            f"👥 *Список гравців:*\n"
+            f"🎮 *{server_name}*\n"
+            f"📍 Версія: CS 1.6 MIX\n"
+            f"🗺 Мапа: {map_name}\n"
+            f"👥 Гравців: {data['players']}\n"
+            f"🔗 Адреса: {MIX_SERVER_IP}:{MIX_SERVER_PORT}\n"
         )
 
-        # Додаємо інформацію про кожного гравця
-        for player in data['players_list']:
-            # Конвертуємо час гравця в хвилини:секунди
-            player_time = time.strftime("%M:%S", time.gmtime(player.get('duration', 0)))
-            # Екрануємо спецсимволи в імені гравця
-            player_name = escape_markdown(player['name'])
-            # Форматуємо рядок гравця
-            message += (
-                f"• {player_name}: "
-                f"🕒 {player_time} \\| "
-                f"{player.get('score', 0)} вбивств\n"
-            )
+        # Додаємо список гравців, якщо вони є
+        if data['players_list']:
+            message += "\n*Список гравців:*\n"
+            
+            # Сортуємо гравців за очками (за спаданням)
+            sorted_players = sorted(data['players_list'], key=lambda x: x.get('score', 0), reverse=True)
+            
+            for player in sorted_players:
+                # Конвертуємо час гравця в хвилини:секунди
+                minutes = int(player.get('duration', 0) // 60)
+                seconds = int(player.get('duration', 0) % 60)
+                player_time = f"{minutes:02d}:{seconds:02d}"
+                
+                # Екрануємо спецсимволи в імені гравця
+                player_name = escape_markdown(player['name'])
+                
+                # Форматуємо рядок гравця
+                message += (
+                    f"• {player_name}: "
+                    f"⏱ {player_time} | "
+                    f"🏆 {player.get('score', 0)} фгр.\n"
+                )
+        else:
+            message += "\n👤 *На сервері немає гравців*"
 
-        # Додаємо час останнього оновлення
-        message += f"\n🕒 *Останнє оновлення:* {escape_markdown(current_time)}"
+        # Додаємо час оновлення
+        message += f"\n\n🕒 *Оновлено:* {escape_markdown(current_time)}"
 
-        # Відправляємо фото з описом
-        await context.bot.send_photo(
-            chat_id=update.effective_chat.id,
-            photo=data['map_image'],
-            caption=message,
+        # Оновлюємо повідомлення замість завантаження
+        await loading_msg.edit_text(
+            message,
             parse_mode='MarkdownV2'
         )
         
-    except KeyError as e:
-        await update.message.reply_text(f"🚨 Помилка формату даних: відсутнє поле {str(e)}")
     except Exception as e:
-        await update.message.reply_text(f"🚨 Помилка: {str(e)}")
+        logger.error(f"❌ Помилка в команді /mix: {e}")
+        try:
+            await update.message.reply_text(f"🚨 Помилка: {str(e)}")
+        except:
+            pass
+
+async def start_command(update: Update, context: CallbackContext):
+    """Обробник команди /start"""
+    await update.message.reply_text(
+        "🤖 Привіт! Я бот для відстеження сервера BOT1CS\n\n"
+        "Доступні команди:\n"
+        "/mix - інформація про сервер CS 1.6 MIX\n\n"
+        f"📍 Сервер: {MIX_SERVER_IP}:{MIX_SERVER_PORT}\n"
+        f"🎮 Версія: 1.0"
+    )
+
+async def help_command(update: Update, context: CallbackContext):
+    """Обробник команди /help"""
+    await update.message.reply_text(
+        "📖 *Доступні команди:*\n\n"
+        "/mix - отримати інформацію про сервер CS 1.6 MIX\n"
+        "/start - початок роботи з ботом\n"
+        "/help - довідка\n\n"
+        f"📍 Адреса сервера: {MIX_SERVER_IP}:{MIX_SERVER_PORT}",
+        parse_mode='Markdown'
+    )
 
 def run_bot():
     """Запускає Telegram бота"""
-    # Створюємо додаток за допомогою білдера
-    application = ApplicationBuilder().token(CONFIG['bot_token']).build()
-
-    # Додаємо обробник тільки для команди /mix
+    # Створюємо додаток
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
+# Додаємо обробники команд
+    application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("mix", mix_command))
+    application.add_handler(CommandHandler("help", help_command))
+
     # Запускаємо бота
-    print("🤖 Бот запущений! Для зупинки натисніть Ctrl+C")
-    print(f"📡 Використовується сервер MIX: {CONFIG.get('mix_server_ip')}:{CONFIG.get('mix_server_port', 27015)}")
+    logger.info(f"🤖 Бот для CS 1.6 запущений!")
+    logger.info(f"📡 Сервер: {MIX_SERVER_IP}:{MIX_SERVER_PORT}")
     application.run_polling()
 
 if name == "main":
-    # Перевіряємо наявність токена бота
-    if not CONFIG.get('bot_token') or CONFIG['bot_token'] == 'ваш_токен':
-        print("❌ Помилка: Не вказано токен бота в конфігурації!")
-        exit(1)
+    logger.info("🚀 Запуск бота для CS 1.6 MIX сервера...")
     
-    # Перевіряємо наявність IP сервера MIX
-    if not CONFIG.get('mix_server_ip') or CONFIG['mix_server_ip'] == 'ваш_mix_сервер_ip':
-        print("❌ Помилка: Не вказано IP-адресу сервера MIX в конфігурації!")
-        print("📝 Відредагуйте файл config.py та вкажіть правильний IP-адресу")
-        exit(1)
+    # Перевіряємо з'єднання з сервером
+    logger.info(f"🔍 Перевірка сервера CS 1.6 {MIX_SERVER_IP}:{MIX_SERVER_PORT}")
+    if check_server_availability():
+        logger.info("✅ Сервер CS 1.6 доступний")
+    else:
+        logger.warning("⚠️ Сервер CS 1.6 недоступний, але бот запускається...")
     
-    print("🧪 Тестування підключення до сервера CS...")
-    
-    # Запускаємо веб-сервер у окремому потоці
-    web_thread = Thread(target=run_web_server)
-    web_thread.daemon = True
-    web_thread.start()
-    print("🌐 Веб-сервер запущений у фоновому режимі")
-
-    # Запускаємо бота в основному потоці
-    run_bot()
+    # Запускаємо бота
+    try:
+        run_bot()
+    except KeyboardInterrupt:
+        logger.info("👋 Бот зупинено")
+    except Exception as e:
+        logger.error(f"❌ Критична помилка: {e}")
