@@ -82,59 +82,7 @@ def get_server_info():
                             'duration': player['duration'],
                             'score': player['score'] if 'score' in player else 0
                         })
-            except Exception as e:
-                logger.warning(f"⚠️ Не вдалося отримати список гравців: {e}")
-            
-            return {
-                'status': 'online',
-                'server_name': info['server_name'],
-                'map': info['map'],
-                'players': f"{info['player_count']}/{info['max_players']}",
-                'player_count': info['player_count'],
-                'max_players': info['max_players'],
-                'players_list': players_list,
-                'game': info['game'],
-                'folder': info['folder']
-            }
-            
-    except valve.source.NoResponseError:
-        logger.warning(f"⚠️ Сервер CS 1.6 {MIX_SERVER_IP}:{MIX_SERVER_PORT} не відповідає")
-        return {
-            'status': 'offline',
-            'message': 'Сервер не відповідає на запит'
-        }
-    except socket.timeout:
-        logger.warning(f"⚠️ Таймаут підключення до {MIX_SERVER_IP}:{MIX_SERVER_PORT}")
-        return {
-            'status': 'offline',
-            'message': 'Таймаут підключення'
-        }
-    except socket.gaierror as e:
-        logger.error(f"❌ Помилка DNS для {MIX_SERVER_IP}:{MIX_SERVER_PORT}: {e}")
-return {
-            'status': 'error',
-            'message': f'Помилка DNS: {str(e)}'
-        }
-    except Exception as e:
-
-        logger.error(f"❌ Помилка запиту до сервера CS 1.6: {e}")
-        return {
-            'status': 'error',
-            'message': str(e)
-        }
-
-def check_server_availability():
-    """Перевіряє доступність сервера CS 1.6"""
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(3)
-        result = sock.connect_ex((MIX_SERVER_IP, MIX_SERVER_PORT))
-        sock.close()
-        return result == 0
-    except Exception as e:
-        logger.error(f"❌ Помилка перевірки сервера CS 1.6: {e}")
-        return False
-
+                        
 async def mix_command(update: Update, context: CallbackContext):
     """Обробник команди /mix - показує інформацію про CS 1.6 MIX сервер"""
     try:
@@ -270,5 +218,6 @@ if __name__ == "__main__":
         logger.info("👋 Бот зупинено")
     except Exception as e:
         logger.error(f"❌ Критична помилка: {e}")
+
 
 
