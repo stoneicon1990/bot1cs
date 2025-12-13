@@ -22,7 +22,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
-logger = logging.getLogger(name)
+logger = logging.getLogger(__name__)
 
 # Отримуємо змінні середовища з Render.com
 BOT_TOKEN = os.environ.get('BOT_TOKEN')
@@ -237,8 +237,8 @@ def run_bot():
     logger.info(f"📡 Сервер: {MIX_SERVER_IP}:{MIX_SERVER_PORT}")
     application.run_polling()
 
-if name == "main":
-    logger.info("🚀 Запуск бота для CS 1.6 MIX сервера...")
+if __name__ == "__main__":
+    logger.info("🚀 Запуск бота для Bot1cs Automix | [5x5]...")
     
     # Перевіряємо з'єднання з сервером
     logger.info(f"🔍 Перевірка сервера CS 1.6 {MIX_SERVER_IP}:{MIX_SERVER_PORT}")
@@ -254,3 +254,4 @@ if name == "main":
         logger.info("👋 Бот зупинено")
     except Exception as e:
         logger.error(f"❌ Критична помилка: {e}")
+
