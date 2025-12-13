@@ -220,9 +220,9 @@ async def mix_command(update: Update, context: CallbackContext):
 async def start_command(update: Update, context: CallbackContext):
     """Обробник команди /start"""
     await update.message.reply_text(
-        "🤖 Привіт! Я бот для відстеження сервера CS 1.6 MIX\n\n"
+        "🤖 Привіт! Я бот для відстеження сервера Bot1cs Automix | [5x5]\n\n"
         "Доступні команди:\n"
-        "/mix - інформація про сервер CS 1.6 MIX\n\n"
+        "/mix - інформація про онлайн\n\n"
         f"📍 Сервер: {MIX_SERVER_IP}:{MIX_SERVER_PORT}"
     )
 
@@ -269,3 +269,4 @@ if __name__ == "__main__":
         logger.info("👋 Бот зупинено")
     except Exception as e:
         logger.error(f"❌ Критична помилка: {e}")
+
