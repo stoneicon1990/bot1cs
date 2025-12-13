@@ -180,7 +180,7 @@ async def mix_command(update: Update, context: CallbackContext):
                 message += (
                     f"• {player_name}: "
                     f"⏱ {player_time} | "
-                    f"🏆 {player.get('score', 0)} фрг.\n"
+                    f"🏆 {player.get('score', 0)} фрг\n"
                 )
         else:
             message += "\n👤 *На сервері немає гравців*"
@@ -254,4 +254,5 @@ if __name__ == "__main__":
         logger.info("👋 Бот зупинено")
     except Exception as e:
         logger.error(f"❌ Критична помилка: {e}")
+
 
