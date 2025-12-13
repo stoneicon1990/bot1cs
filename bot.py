@@ -42,8 +42,23 @@ def escape_markdown(text):
     """Екранує спецсимволи MarkdownV2"""
     if not text:
         return ""
-    escape_chars = r'_*[]()~`>#+-=|{}.!'
+    # Символи, які потрібно екранувати в MarkdownV2
+    escape_chars = r'_*[]()~>#+-=|{}.!'
     return ''.join(['\\' + char if char in escape_chars else char for char in str(text)])
+
+def escape_for_markdown(text):
+    """Екранує текст для MarkdownV2, включаючи крапки"""
+    if not text:
+        return ""
+    # Екрануємо всі спецсимволи MarkdownV2
+    escape_chars = r'_*[]()~>#+-=|{}.!'
+    result = ''
+    for char in str(text):
+        if char in escape_chars:
+            result += '\\' + char
+        else:
+            result += char
+    return result
 
 def get_server_info():
     """
@@ -96,7 +111,7 @@ def get_server_info():
         }
     except socket.gaierror as e:
         logger.error(f"❌ Помилка DNS для {MIX_SERVER_IP}:{MIX_SERVER_PORT}: {e}")
-        return {
+return {
             'status': 'error',
             'message': f'Помилка DNS: {str(e)}'
         }
@@ -132,7 +147,7 @@ async def mix_command(update: Update, context: CallbackContext):
         
         if data['status'] == 'offline':
             await loading_msg.edit_text(
-                f"🔴 Сервер Bot1cs Automix | [5x5] ({MIX_SERVER_IP}:{MIX_SERVER_PORT}) не відповідає.\n"
+                f"🔴 Bot1cs Automix | [5x5] ({MIX_SERVER_IP}:{MIX_SERVER_PORT}) не відповідає.\n"
                 f"Можливо, він вимкнений або недоступний."
             )
             return
@@ -147,17 +162,19 @@ async def mix_command(update: Update, context: CallbackContext):
         # Отримуємо поточний час
         current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # Екрануємо назву сервера
-        server_name = escape_markdown(data['server_name'])
-        map_name = escape_markdown(data['map'])
+        # Екрануємо всі текстові поля для MarkdownV2
+        server_name = escape_for_markdown(data['server_name'])
+        map_name = escape_for_markdown(data['map'])
+        escaped_ip = escape_for_markdown(MIX_SERVER_IP)
+        escaped_port = escape_for_markdown(str(MIX_SERVER_PORT))
+        escaped_current_time = escape_for_markdown(current_time)
 
-        # Формуємо повідомлення
+        # Формуємо повідомлення з правильним екрануванням
         message = (
             f"🎮 *{server_name}*\n"
-            f"📍 Версія: 1.6\n"
             f"🗺 Мапа: {map_name}\n"
-            f"👥 Гравців: {data['players']}\n"
-            f"🔗 Адреса: {MIX_SERVER_IP}:{MIX_SERVER_PORT}\n"
+            f"👥 Гравців: {escape_for_markdown(data['players'])}\n"
+            f"🔗 Адреса: {escaped_ip}\\:{escaped_port}\n"  # Екрануємо двокрапку
         )
 
         # Додаємо список гравців, якщо вони є
@@ -174,19 +191,19 @@ async def mix_command(update: Update, context: CallbackContext):
                 player_time = f"{minutes:02d}:{seconds:02d}"
                 
                 # Екрануємо спецсимволи в імені гравця
-                player_name = escape_markdown(player['name'])
+                player_name = escape_for_markdown(player['name'])
                 
                 # Форматуємо рядок гравця
                 message += (
                     f"• {player_name}: "
-                    f"⏱ {player_time} | "
+                    f"⏱ {player_time} \\| "  # Екрануємо вертикальну риску
                     f"🏆 {player.get('score', 0)} фрг\n"
                 )
         else:
             message += "\n👤 *На сервері немає гравців*"
 
         # Додаємо час оновлення
-        message += f"\n\n🕒 *Оновлено:* {escape_markdown(current_time)}"
+        message += f"\n\n🕒 *Оновлено:* {escaped_current_time}"
 
         # Оновлюємо повідомлення замість завантаження
         await loading_msg.edit_text(
@@ -200,26 +217,24 @@ async def mix_command(update: Update, context: CallbackContext):
             await update.message.reply_text(f"🚨 Помилка: {str(e)}")
         except:
             pass
-
 async def start_command(update: Update, context: CallbackContext):
     """Обробник команди /start"""
     await update.message.reply_text(
-        "🤖 Привіт! Я бот для відстеження сервера Bot1cs Automix | [5x5]\n\n"
+        "🤖 Привіт! Я бот для відстеження сервера CS 1.6 MIX\n\n"
         "Доступні команди:\n"
-        "/mix - інформація про онлайн Bot1cs Automix | [5x5]\n\n"
-        f"📍 Сервер: {MIX_SERVER_IP}:{MIX_SERVER_PORT}\n"
-        f"🎮 Версія: Counter-Strike 1.6"
+        "/mix - інформація про сервер CS 1.6 MIX\n\n"
+        f"📍 Сервер: {MIX_SERVER_IP}:{MIX_SERVER_PORT}"
     )
 
 async def help_command(update: Update, context: CallbackContext):
     """Обробник команди /help"""
     await update.message.reply_text(
         "📖 *Доступні команди:*\n\n"
-        "/mix - отримати інформацію про сервер CS 1.6 MIX\n"
+        "/mix - отримати інформацію про сервер CS 1\\.6 MIX\n"
         "/start - початок роботи з ботом\n"
         "/help - довідка\n\n"
-        f"📍 Адреса сервера: {MIX_SERVER_IP}:{MIX_SERVER_PORT}",
-        parse_mode='Markdown'
+        f"📍 Адреса сервера: {MIX_SERVER_IP}\\:{MIX_SERVER_PORT}",
+        parse_mode='MarkdownV2'
     )
 
 def run_bot():
@@ -238,12 +253,12 @@ def run_bot():
     application.run_polling()
 
 if __name__ == "__main__":
-    logger.info("🚀 Запуск бота для Bot1cs Automix | [5x5]...")
+    logger.info("🚀 Запуск бота для CS 1.6 MIX сервера...")
     
     # Перевіряємо з'єднання з сервером
     logger.info(f"🔍 Перевірка сервера CS 1.6 {MIX_SERVER_IP}:{MIX_SERVER_PORT}")
     if check_server_availability():
-        logger.info("✅ Сервер CS 1.6 доступний")
+        logger.info("✅ Bot1cs Automix | [5x5] доступний")
     else:
         logger.warning("⚠️ Сервер CS 1.6 недоступний, але бот запускається...")
     
@@ -254,5 +269,3 @@ if __name__ == "__main__":
         logger.info("👋 Бот зупинено")
     except Exception as e:
         logger.error(f"❌ Критична помилка: {e}")
-
-
