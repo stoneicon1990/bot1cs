@@ -116,6 +116,7 @@ return {
             'message': f'Помилка DNS: {str(e)}'
         }
     except Exception as e:
+
         logger.error(f"❌ Помилка запиту до сервера CS 1.6: {e}")
         return {
             'status': 'error',
@@ -269,4 +270,5 @@ if __name__ == "__main__":
         logger.info("👋 Бот зупинено")
     except Exception as e:
         logger.error(f"❌ Критична помилка: {e}")
+
 
