@@ -114,7 +114,8 @@ def get_server_info():
             'status': 'error',
             'message': str(e)
         }
-        def check_server_availability():
+        
+    def check_server_availability():
     """Перевіряє доступність сервера CS 1.6"""
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -271,4 +272,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
